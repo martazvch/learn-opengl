@@ -13,29 +13,35 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    // GLFW
     const glfw_dep = b.dependency("glfw_zig", .{
         .target = target,
         .optimize = optimize,
     });
     exe.root_module.linkLibrary(glfw_dep.artifact("glfw"));
 
+    // GLAD
     const glad_dep = b.dependency("zig_glad", .{
         .target = target,
         .optimize = optimize,
     });
     exe.root_module.linkLibrary(glad_dep.artifact("glad"));
 
+    // ZLM
     const zlm_dep = b.dependency("zlm", .{
         .target = target,
         .optimize = optimize,
     });
     exe.root_module.addImport("zlm", zlm_dep.module("zlm"));
 
-    exe.root_module.addIncludePath(b.path("src/includes"));
-    exe.root_module.addCSourceFile(.{
-        .file = b.path("src/includes/stb_image.c"),
+    // ZSTBI
+    const zstbi_dep = b.dependency("zstbi", .{
+        .target = target,
+        .optimize = optimize,
     });
+    exe.root_module.addImport("zstbi", zstbi_dep.module("root"));
 
+    // Assets
     b.installFile("src/assets/wood_container.jpg", "bin/assets/wood_container.jpg");
 
     b.installArtifact(exe);

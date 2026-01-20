@@ -1,5 +1,6 @@
 const std = @import("std");
 const engine = @import("engine.zig");
+const zstbi = @import("zstbi");
 
 // fn customLog(
 //     comptime level: std.log.Level,
@@ -31,10 +32,12 @@ pub fn main() !void {
             .ReleaseFast, .ReleaseSmall => .{ std.heap.smp_allocator, false },
         };
     };
-    _ = allocator; // autofix
     defer if (is_debug) {
         std.debug.assert(debug_allocator.deinit() == .ok);
     };
+
+    zstbi.init(allocator);
+    defer zstbi.deinit();
 
     engine.setupWindow();
 }

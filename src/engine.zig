@@ -3,7 +3,6 @@ const Allocator = std.mem.Allocator;
 const c = @import("c.zig");
 const glfw = c.glfw;
 const gl = c.gl;
-const stbi = c.stbi;
 const math = @import("math.zig").math;
 const Shader = @import("Shader.zig");
 const Texture = @import("Texture.zig");

@@ -5,7 +5,3 @@ pub const glfw = @cImport({
 pub const gl = @cImport({
     @cInclude("glad/glad.h");
 });
-
-pub const stbi = @cImport({
-    @cInclude("stb_image.h");
-});
