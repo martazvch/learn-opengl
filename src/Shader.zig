@@ -71,6 +71,10 @@ pub fn setMat4f(self: *const Self, name: [*c]const u8, value: math.Mat4) void {
     gl.glUniformMatrix4fv(self.getUniform(name), 1, gl.GL_FALSE, @ptrCast(&value.fields));
 }
 
+pub fn setVec3(self: *const Self, name: [*c]const u8, value: math.Vec3) void {
+    gl.glUniform3fv(self.getUniform(name), 1, @ptrCast(&.{ value.x, value.y, value.z }));
+}
+
 fn getUniform(self: *const Self, name: [*c]const u8) i32 {
     const loc = gl.glGetUniformLocation(self.prog, name);
 

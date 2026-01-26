@@ -9,7 +9,7 @@ const Texture = @import("Texture.zig");
 const Camera = @import("Camera.zig");
 
 var wireframe: bool = false;
-var cam: Camera = .init(.new(0.0, 0.0, 3.0), 5.0);
+var cam: Camera = .init(.new(0.0, 2.0, 3.0), 5.0);
 var delta_time: f32 = 0.0;
 var mouse_pos: math.Vec2 = .zero;
 var first_mouse: bool = true;
@@ -86,8 +86,9 @@ pub fn setupWindow() void {
     glfw.glfwWindowHint(glfw.GLFW_CONTEXT_VERSION_MINOR, 3);
     glfw.glfwWindowHint(glfw.GLFW_OPENGL_PROFILE, glfw.GLFW_OPENGL_CORE_PROFILE);
 
-    // TODO: on macOS?
-    // glfw.glfwWindowHint(glfw.GLFW_OPENGL_FORWARD_COMPAT, glfw.GL_TRUE);
+    if (@import("builtin").os.tag == .macos) {
+        glfw.glfwWindowHint(glfw.GLFW_OPENGL_FORWARD_COMPAT, glfw.GL_TRUE);
+    }
 
     const window = glfw.glfwCreateWindow(VIEWPORT.x, VIEWPORT.y, "LearnOpenGL", null, null) orelse {
         glfw.glfwTerminate();
@@ -112,78 +113,67 @@ pub fn setupWindow() void {
     _ = glfw.glfwSetFramebufferSizeCallback(window, frameBufferSizeCallback);
     _ = glfw.glfwSetKeyCallback(window, keyCallback);
 
-    const shader_prog = Shader.init(@embedFile("vert.glsl"), @embedFile("frag.glsl"));
+    const container_shader = Shader.init(
+        @embedFile("assets/shaders/vert.glsl"),
+        @embedFile("assets/shaders/frag.glsl"),
+    );
+
+    const light_shader = Shader.init(
+        @embedFile("assets/shaders/light_vert.glsl"),
+        @embedFile("assets/shaders/light_frag.glsl"),
+    );
 
     // Data
     // zig fmt: off
-    // const vertices = [_]f32{
-    //      // positions      // colors        // texture coords
-    //      0.5,  0.5, 0.0,   1.0, 0.0, 0.0,   1.0, 1.0,   // top right
-    //      0.5, -0.5, 0.0,   0.0, 1.0, 0.0,   1.0, 0.0,   // bottom right
-    //     -0.5, -0.5, 0.0,   0.0, 0.0, 1.0,   0.0, 0.0,   // bottom let
-    //     -0.5,  0.5, 0.0,   1.0, 1.0, 0.0,   0.0, 1.0    // top let 
-    // };
-    const vertices = [_]f32 {
-        -0.5, -0.5, -0.5,  0.0, 0.0,
-         0.5, -0.5, -0.5,  1.0, 0.0,
-         0.5,  0.5, -0.5,  1.0, 1.0,
-         0.5,  0.5, -0.5,  1.0, 1.0,
-        -0.5,  0.5, -0.5,  0.0, 1.0,
-        -0.5, -0.5, -0.5,  0.0, 0.0,
+    // Cube's vertices and normals
+    const vertices = [_]f32{
+        // positions       // normals        // texture coords
+        -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,  0.0,  0.0,
+         0.5, -0.5, -0.5,  0.0,  0.0, -1.0,  1.0,  0.0,
+         0.5,  0.5, -0.5,  0.0,  0.0, -1.0,  1.0,  1.0,
+         0.5,  0.5, -0.5,  0.0,  0.0, -1.0,  1.0,  1.0,
+        -0.5,  0.5, -0.5,  0.0,  0.0, -1.0,  0.0,  1.0,
+        -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,  0.0,  0.0,
 
-        -0.5, -0.5,  0.5,  0.0, 0.0,
-         0.5, -0.5,  0.5,  1.0, 0.0,
-         0.5,  0.5,  0.5,  1.0, 1.0,
-         0.5,  0.5,  0.5,  1.0, 1.0,
-        -0.5,  0.5,  0.5,  0.0, 1.0,
-        -0.5, -0.5,  0.5,  0.0, 0.0,
+        -0.5, -0.5,  0.5,  0.0,  0.0,  1.0,  0.0,  0.0,
+         0.5, -0.5,  0.5,  0.0,  0.0,  1.0,  1.0,  0.0,
+         0.5,  0.5,  0.5,  0.0,  0.0,  1.0,  1.0,  1.0,
+         0.5,  0.5,  0.5,  0.0,  0.0,  1.0,  1.0,  1.0,
+        -0.5,  0.5,  0.5,  0.0,  0.0,  1.0,  0.0,  1.0,
+        -0.5, -0.5,  0.5,  0.0,  0.0,  1.0,  0.0,  0.0,
 
-        -0.5,  0.5,  0.5,  1.0, 0.0,
-        -0.5,  0.5, -0.5,  1.0, 1.0,
-        -0.5, -0.5, -0.5,  0.0, 1.0,
-        -0.5, -0.5, -0.5,  0.0, 1.0,
-        -0.5, -0.5,  0.5,  0.0, 0.0,
-        -0.5,  0.5,  0.5,  1.0, 0.0,
+        -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,  1.0,  0.0,
+        -0.5,  0.5, -0.5, -1.0,  0.0,  0.0,  1.0,  1.0,
+        -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,  0.0,  1.0,
+        -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,  0.0,  1.0,
+        -0.5, -0.5,  0.5, -1.0,  0.0,  0.0,  0.0,  0.0,
+        -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,  1.0,  0.0,
 
-         0.5,  0.5,  0.5,  1.0, 0.0,
-         0.5,  0.5, -0.5,  1.0, 1.0,
-         0.5, -0.5, -0.5,  0.0, 1.0,
-         0.5, -0.5, -0.5,  0.0, 1.0,
-         0.5, -0.5,  0.5,  0.0, 0.0,
-         0.5,  0.5,  0.5,  1.0, 0.0,
+         0.5,  0.5,  0.5,  1.0,  0.0,  0.0,  1.0,  0.0,
+         0.5,  0.5, -0.5,  1.0,  0.0,  0.0,  1.0,  1.0,
+         0.5, -0.5, -0.5,  1.0,  0.0,  0.0,  0.0,  1.0,
+         0.5, -0.5, -0.5,  1.0,  0.0,  0.0,  0.0,  1.0,
+         0.5, -0.5,  0.5,  1.0,  0.0,  0.0,  0.0,  0.0,
+         0.5,  0.5,  0.5,  1.0,  0.0,  0.0,  1.0,  0.0,
 
-        -0.5, -0.5, -0.5,  0.0, 1.0,
-         0.5, -0.5, -0.5,  1.0, 1.0,
-         0.5, -0.5,  0.5,  1.0, 0.0,
-         0.5, -0.5,  0.5,  1.0, 0.0,
-        -0.5, -0.5,  0.5,  0.0, 0.0,
-        -0.5, -0.5, -0.5,  0.0, 1.0,
+        -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,  0.0,  1.0,
+         0.5, -0.5, -0.5,  0.0, -1.0,  0.0,  1.0,  1.0,
+         0.5, -0.5,  0.5,  0.0, -1.0,  0.0,  1.0,  0.0,
+         0.5, -0.5,  0.5,  0.0, -1.0,  0.0,  1.0,  0.0,
+        -0.5, -0.5,  0.5,  0.0, -1.0,  0.0,  0.0,  0.0,
+        -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,  0.0,  1.0,
 
-        -0.5,  0.5, -0.5,  0.0, 1.0,
-         0.5,  0.5, -0.5,  1.0, 1.0,
-         0.5,  0.5,  0.5,  1.0, 0.0,
-         0.5,  0.5,  0.5,  1.0, 0.0,
-        -0.5,  0.5,  0.5,  0.0, 0.0,
-        -0.5,  0.5, -0.5,  0.0, 1.0,
+        -0.5,  0.5, -0.5,  0.0,  1.0,  0.0,  0.0,  1.0,
+         0.5,  0.5, -0.5,  0.0,  1.0,  0.0,  1.0,  1.0,
+         0.5,  0.5,  0.5,  0.0,  1.0,  0.0,  1.0,  0.0,
+         0.5,  0.5,  0.5,  0.0,  1.0,  0.0,  1.0,  0.0,
+        -0.5,  0.5,  0.5,  0.0,  1.0,  0.0,  0.0,  0.0,
+        -0.5,  0.5, -0.5,  0.0,  1.0,  0.0,  0.0,  1.0,
     };
     // zig fmt: on
 
     const cubes_pos = [_]math.Vec3{
-        math.vec3(0.0, 0.0, 0.0),
-        math.vec3(2.0, 5.0, -15.0),
-        math.vec3(-1.5, -2.2, -2.5),
-        math.vec3(-3.8, -2.0, -12.3),
-        math.vec3(2.4, -0.4, -3.5),
-        math.vec3(-1.7, 3.0, -7.5),
-        math.vec3(1.3, -2.0, -2.5),
-        math.vec3(1.5, 2.0, -2.5),
-        math.vec3(1.5, 0.2, -1.5),
-        math.vec3(-1.3, 1.0, -1.5),
-    };
-
-    const indicies = [_]u32{
-        0, 1, 3, // first triangle
-        1, 2, 3, // second triangle
+        math.vec3(-2.0, 0.0, -5.0),
     };
 
     // Initialization code (done once (unless your object frequently changes))
@@ -193,7 +183,7 @@ pub fn setupWindow() void {
     // We bind this vao so it remembers all other configurations of the vbo
     gl.glBindVertexArray(vao);
 
-    // Vexrtex Buffer Object
+    // Vertex Buffer Object
     var vbo: c_uint = 0;
     gl.glGenBuffers(1, &vbo);
     // Binds it to type ARRAY_BUFFER
@@ -203,34 +193,42 @@ pub fn setupWindow() void {
     // Copy the data to the target
     gl.glBufferData(gl.GL_ARRAY_BUFFER, @sizeOf(@TypeOf(vertices)), &vertices, gl.GL_STATIC_DRAW);
 
-    // Element buffer object
-    var ebo: c_uint = 0;
-    gl.glGenBuffers(1, &ebo);
-    // Binds to ELEMENT_ARRAY
-    gl.glBindBuffer(gl.GL_ELEMENT_ARRAY_BUFFER, ebo);
-    gl.glBufferData(gl.GL_ELEMENT_ARRAY_BUFFER, @sizeOf(@TypeOf(indicies)), &indicies, gl.GL_STATIC_DRAW);
-
     // First arg correspond to `location 0` in our shader
     // Second is size of attribute, we use vec3
     // Thirs type of data
     // We don't want normalization of our data
     // Stride/padding between our data. The array is tightly packed
-    // Offset of where the position data begins in the buffer (0 for us)
-    gl.glVertexAttribPointer(0, 3, gl.GL_FLOAT, gl.GL_FALSE, 5 * @sizeOf(f32), @ptrFromInt(0));
+    // Offset of where the position data begins in the buffer
+    gl.glVertexAttribPointer(0, 3, gl.GL_FLOAT, gl.GL_FALSE, 8 * @sizeOf(f32), @ptrFromInt(0));
     gl.glEnableVertexAttribArray(0);
-    // gl.glVertexAttribPointer(1, 3, gl.GL_FLOAT, gl.GL_FALSE, 8 * @sizeOf(f32), @ptrFromInt(3 * @sizeOf(f32)));
-    // gl.glEnableVertexAttribArray(1);
-    // gl.glVertexAttribPointer(2, 2, gl.GL_FLOAT, gl.GL_FALSE, 8 * @sizeOf(f32), @ptrFromInt(6 * @sizeOf(f32)));
-    gl.glVertexAttribPointer(2, 2, gl.GL_FLOAT, gl.GL_FALSE, 5 * @sizeOf(f32), @ptrFromInt(3 * @sizeOf(f32)));
+    gl.glVertexAttribPointer(1, 3, gl.GL_FLOAT, gl.GL_FALSE, 8 * @sizeOf(f32), @ptrFromInt(3 * @sizeOf(f32)));
+    gl.glEnableVertexAttribArray(1);
+    gl.glVertexAttribPointer(2, 2, gl.GL_FLOAT, gl.GL_FALSE, 8 * @sizeOf(f32), @ptrFromInt(6 * @sizeOf(f32)));
     gl.glEnableVertexAttribArray(2);
 
-    const tex1 = Texture.create("assets/wood_container.jpg", .rgb);
-    const tex2 = Texture.create("assets/awesomeface.png", .rgba);
-
     // Tell the shader which sampler has which
-    shader_prog.use();
-    shader_prog.setInt("tex1", 0);
-    shader_prog.setInt("tex2", 1);
+    container_shader.use();
+
+    const light_pos: math.Vec3 = math.vec3(-2.0, 2.0, -2.0);
+    container_shader.setVec3("light.position", light_pos);
+    container_shader.setVec3("light.ambient", .new(0.2, 0.2, 0.2));
+    container_shader.setVec3("light.diffuse", .new(0.5, 0.5, 0.5));
+    container_shader.setVec3("light.specular", .new(1.0, 1.0, 1.0));
+    container_shader.setFloat("material.shininess", 64.0);
+
+    container_shader.setInt("material.diffuse", 0);
+    const diffuse_map = Texture.create("assets/container2.png", .rgba);
+
+    container_shader.setInt("material.specular", 1);
+    const specular_map = Texture.create("assets/container2_specular.png", .rgba);
+
+    // Lights
+    var light_vao: u32 = 0;
+    gl.glGenVertexArrays(1, &light_vao);
+    gl.glBindVertexArray(light_vao);
+    gl.glBindBuffer(gl.GL_ARRAY_BUFFER, vbo);
+    gl.glVertexAttribPointer(0, 3, gl.GL_FLOAT, gl.GL_FALSE, 8 * @sizeOf(f32), @ptrFromInt(0));
+    gl.glEnableVertexAttribArray(0);
 
     gl.glEnable(gl.GL_DEPTH_TEST);
 
@@ -245,41 +243,50 @@ pub fn setupWindow() void {
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT);
 
         // To tell we use those shaders
-        shader_prog.use();
+        container_shader.use();
         // Invokes the vao (which contains all the vbo sub-calls)
-        gl.glBindTexture(gl.GL_TEXTURE_2D, tex1);
+        // gl.glBindTexture(gl.GL_TEXTURE_2D, tex1);
         gl.glBindVertexArray(vao);
 
         // Bind first two of 16 available texture slots
-        gl.glActiveTexture(gl.GL_TEXTURE0);
-        gl.glBindTexture(gl.GL_TEXTURE_2D, tex1);
-        gl.glActiveTexture(gl.GL_TEXTURE1);
-        gl.glBindTexture(gl.GL_TEXTURE_2D, tex2);
+        // gl.glActiveTexture(gl.GL_TEXTURE0);
+        // gl.glBindTexture(gl.GL_TEXTURE_2D, tex1);
+        // gl.glActiveTexture(gl.GL_TEXTURE1);
+        // gl.glBindTexture(gl.GL_TEXTURE_2D, tex2);
 
         // Add data to uniform
         const time: f32 = @floatCast(glfw.glfwGetTime());
         delta_time = time - last_frame;
         last_frame = time;
 
-        const green: f32 = (@sin(time) / 2.0) + 0.5;
-        shader_prog.setFloat("green", green);
-
         const view = cam.getLookAt();
-        shader_prog.setMat4f("view", view);
+        container_shader.setMat4f("view", view);
 
-        // 600 and 800 are our viewport size
         const projection = math.Mat4.createPerspective(math.toRadians(cam.fov), VIEWPORT.x / VIEWPORT.y, 0.1, 100.0);
-        shader_prog.setMat4f("projection", projection);
+        container_shader.setMat4f("projection", projection);
+
+        container_shader.setVec3("viewPos", cam.pos);
+        // container_shader.setVec3("material.ambient", .new(1.0, 0.5, 0.31));
+        container_shader.setVec3("material.diffuse", .new(1.0, 0.5, 0.31));
+        container_shader.setVec3("material.specular", .new(0.5, 0.5, 0.5));
+        container_shader.setFloat("material.shininess", 32.0);
+
+        gl.glActiveTexture(gl.GL_TEXTURE0);
+        gl.glBindTexture(gl.GL_TEXTURE_2D, diffuse_map);
+        gl.glActiveTexture(gl.GL_TEXTURE1);
+        gl.glBindTexture(gl.GL_TEXTURE_2D, specular_map);
 
         for (cubes_pos, 0..) |pos, i| {
-            var model = math.Mat4.identity;
+            _ = pos; // autofix
+            const model = math.Mat4.identity;
             const angle = 20.0 * @as(f32, @floatFromInt(i));
+            _ = angle; // autofix
 
             // Or do in reverse order w/r tutorial but I think it's the correct way, always rotate before translating
-            model = model.mul(.createAngleAxis(math.vec3(1.0, 0.3, 0.5), math.toRadians(angle)));
-            model = model.mul(.createTranslation(pos));
+            // model = model.mul(.createAngleAxis(math.vec3(1.0, 0.3, 0.5), math.toRadians(angle)));
+            // model = model.mul(.createTranslation(pos));
 
-            shader_prog.setMat4f("model", model);
+            container_shader.setMat4f("model", model);
 
             // Draw
             gl.glDrawArrays(gl.GL_TRIANGLES, 0, 36);
@@ -287,6 +294,22 @@ pub fn setupWindow() void {
 
         // Draw elements based on the indicies. Second args is number of elems and last is the offset
         // gl.glDrawElements(gl.GL_TRIANGLES, 6, gl.GL_UNSIGNED_INT, @ptrFromInt(0));
+
+        // Lights
+        {
+            const model = math.Mat4.batchMul(&.{
+                .createUniformScale(0.2),
+                .createTranslation(light_pos),
+            });
+
+            light_shader.use();
+            light_shader.setMat4f("view", view);
+            light_shader.setMat4f("projection", projection);
+            light_shader.setMat4f("model", model);
+
+            gl.glBindVertexArray(light_vao);
+            gl.glDrawArrays(gl.GL_TRIANGLES, 0, 36);
+        }
 
         glfw.glfwSwapBuffers(window);
     }
